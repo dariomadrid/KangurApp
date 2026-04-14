@@ -13,10 +13,10 @@
       </IonRow>
     </IonGrid>
 
-    <IonLoading :is-open="loading" message="Carregant dades..." spinner="crescent" />
+    <IonLoading :is-open="loadingUsers" message="Carregant usuaris..." spinner="crescent" />
 
-    <div v-if="!loading" class="ion-margin-top">
-      <IonSegment v-model="currentTab" @ionChange="currentTab = ($event.detail.value as string)">
+    <div v-if="!loadingUsers" class="ion-margin-top">
+      <IonSegment v-model="currentTab" @ionChange="onTabChange($event)">
         <IonSegmentButton value="usuaris">
           <IonLabel>Usuaris</IonLabel>
         </IonSegmentButton>
@@ -26,7 +26,7 @@
       </IonSegment>
     </div>
 
-    <div v-if="currentTab === 'usuaris' && !loading" class="ion-margin-top">
+    <div v-if="currentTab === 'usuaris' && !loadingUsers" class="ion-margin-top">
       <IonRow class="ion-justify-content-center ion-margin-top">
         <IonCol size="12" size-md="6">
           <IonItem lines="none" class="search-item">
@@ -50,20 +50,32 @@
                         <div class="user-name">{{ user.name }}</div>
                         <div class="user-email-sub">{{ user.email }}</div>
                         <div class="user-date">Creat: {{ formatDate(user.createdAt) }}</div>
+                        <div class="user-role" v-if="currentRole === 'gestor'" style="margin-top: 4px; font-size: 0.9em; color: #666;">Rol: <strong>{{ user.rol }}</strong></div>
                       </div>
                     </div>
                   </IonCol>
-                  <IonCol size="12" size-md="3" class="stats-col">
-                    <div class="stat-item">Nadons: <strong>{{ user.nadons.length }}</strong></div>
-                    <div class="stat-item">Sessions: <strong>{{ user.cronometres.length }}</strong></div>
-                    <div v-if="user.cangurs.length" class="stat-item cangurs-list">
-                      Cangurs: <span>{{ getCangursList(user.cangurs) }}</span>
+                  <IonCol
+                    size="12"
+                    :size-md="currentRole === 'admin' ? '3' : '7'"
+                    :class="['stats-col', { 'stats-col-manager': currentRole !== 'admin' }]"
+                  >
+                    <template v-if="user.detailsLoaded">
+                      <div class="stat-item">Nadons: <strong>{{ user.nadons.length }}</strong></div>
+                      <div class="stat-item">Sessions: <strong>{{ user.cronometres.length }}</strong></div>
+                      <div v-if="user.cangurs.length" class="stat-item cangurs-list">
+                        Cangurs: <span>{{ getCangursList(user.cangurs) }}</span>
+                      </div>
+                    </template>
+                    <div v-else class="stat-loader">
+                      <IonSpinner name="crescent" color="medium" />
+                      <span>Carregant resum...</span>
                     </div>
                   </IonCol>
-                  <IonCol size="12" size-md="4" class="admin-actions">
+                  <!-- Admin actions column: only visible for admin -->
+                  <IonCol v-if="currentRole === 'admin'" size="12" size-md="4" class="admin-actions">
                     <IonItem lines="none" class="admin-toggle-item">
                       <IonLabel>Rol del usuari</IonLabel>
-                      <IonSelect :disabled="currentRole !== 'admin'" placeholder="Selecciona rol" :value="user.rol"
+                      <IonSelect placeholder="Selecciona rol" :value="user.rol"
                         @ionChange="(event) => onRoleChange(user.uid, event.detail.value)">
                         <IonSelectOption value="usuari">Usuari</IonSelectOption>
                         <IonSelectOption value="admin">Admin</IonSelectOption>
@@ -74,7 +86,7 @@
                     <IonButton
                       fill="clear"
                       color="danger"
-                      :disabled="currentRole !== 'admin' || isSavingAdminId === user.uid"
+                      :disabled="isSavingAdminId === user.uid"
                       @click="confirmDeleteUser(user.uid, user.name)"
                       size="small"
                     >
@@ -88,13 +100,13 @@
         </IonRow>
         <IonRow v-else>
           <IonCol class="ion-text-center ion-padding">
-            <IonText color="medium">{{ loadDataError || "No s'han trobat usuaris" }}</IonText>
+            <IonText color="medium">{{ usersLoadError || "No s'han trobat usuaris" }}</IonText>
           </IonCol>
         </IonRow>
       </IonGrid>
     </div>
 
-    <div v-if="currentTab === 'cronometres' && !loading" class="ion-margin-top">
+    <div v-if="currentTab === 'cronometres' && !loadingUsers" class="ion-margin-top">
       <IonRow class="ion-justify-content-center">
         <IonCol size="12" size-lg="11">
           <IonCard class="export-panel-compact">
@@ -130,7 +142,7 @@
                 </div>
 
                 <div class="flex-item-actions">
-                  <IonButton color="success" class="btn-export-inline" @click="exportSessionsCSV"
+                  <IonButton color="success" class="btn-export-inline" :disabled="loadingDetails" @click="exportSessionsCSV"
                     title="Descarregar CSV">
                     <IonIcon slot="start" :icon="downloadOutline"></IonIcon>
                     <span class="csv-btn-label">CSV</span>
@@ -138,7 +150,7 @@
                 </div>
               </div>
               <div class="export-mail-row">
-                <IonButton expand="block" fill="outline" color="primary" class="btn-export-mail" @click="sendSessionsCSVByMail">
+                <IonButton expand="block" fill="outline" color="primary" class="btn-export-mail" :disabled="loadingDetails" @click="sendSessionsCSVByMail">
                   <IonIcon slot="start" :icon="mailOutline"></IonIcon>
                   Enviar CSV al meu correu
                 </IonButton>
@@ -148,7 +160,11 @@
         </IonCol>
       </IonRow>
 
-      <div v-if="cronometresByUser.length > 0" class="ion-padding">
+      <div v-if="loadingDetails" class="ion-padding ion-text-center">
+        <IonSpinner name="crescent" color="primary" />
+        <p class="sessions-loading-text">Carregant sessions, nadons i cangurs...</p>
+      </div>
+      <div v-else-if="cronometresByUser.length > 0" class="ion-padding">
         <div v-for="userGroup in cronometresByUser" :key="userGroup.userEmail" class="session-group">
           <div class="group-header">
             <span class="user-title">{{ userGroup.userName || userGroup.userEmail }}</span>
@@ -169,11 +185,12 @@
                   <div class="s-date">{{ formatDate(crono.createdAt) }}</div>
                   <div class="s-duration">{{ formatSecondsToMMSS(crono.temps) }}</div>
                 </div>
+                <!-- Allow admin and gestor to delete sessions -->
                 <IonButton
+                  v-if="currentRole === 'admin' || currentRole === 'gestor'"
                   fill="clear"
                   color="danger"
                   class="session-delete-btn"
-                  :disabled="currentRole !== 'admin'"
                   @click="confirmDeleteSession(crono.userId, crono.sessionId, crono.nadoNom || 'sessió')"
                   size="small"
                 >
@@ -185,7 +202,7 @@
         </div>
       </div>
       <div v-else class="ion-padding ion-text-center">
-        <IonText color="medium">{{ loadDataError || 'No hi ha sessions disponibles.' }}</IonText>
+        <IonText color="medium">{{ detailsLoadError || 'No hi ha sessions disponibles.' }}</IonText>
       </div>
     </div>
     
@@ -270,7 +287,7 @@ import {
   IonBadge, IonModal, IonHeader, IonToolbar, IonTitle,
   IonButtons, IonContent, IonList, IonCheckbox, IonSearchbar, IonToast
 } from '@ionic/vue'
-import { downloadOutline, chevronForwardOutline, mailOutline, calendarOutline, trashOutline } from 'ionicons/icons'
+import { downloadOutline, chevronForwardOutline, mailOutline, trashOutline } from 'ionicons/icons'
 import AppLayout from '@/components/AppLayout.vue'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -282,7 +299,9 @@ import { Capacitor } from '@capacitor/core'
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 
 const router = useRouter()
-const loading = ref(true)
+const loadingUsers = ref(true)
+const loadingDetails = ref(false)
+const detailsLoaded = ref(false)
 const currentTab = ref('usuaris')
 const isSavingAdminId = ref('')
 const currentRole = ref('')
@@ -297,7 +316,8 @@ const selectedExportUsers = ref<string[]>([])
 const showToast = ref(false)
 const toastMessage = ref('')
 const toastColor = ref('success')
-const loadDataError = ref('')
+const usersLoadError = ref('')
+const detailsLoadError = ref('')
 
 const showDeleteUserAlert = ref(false)
 const showDeleteSessionAlert = ref(false)
@@ -321,6 +341,8 @@ interface User {
   cronometres: any[];
   nadons: any[];
   cangurs: any[];
+  detailsLoaded: boolean;
+  eliminado?: boolean;
 }
 
 const allUsers = ref<User[]>([])
@@ -361,10 +383,8 @@ const toggleSelectAll = (event: any) => {
 const toggleUserSelection = (email: string) => {
   const index = selectedExportUsers.value.indexOf(email)
   if (index > -1) {
-    // Crear un nuevo array sin el elemento para que Vue detecte el cambio
     selectedExportUsers.value = selectedExportUsers.value.filter((_, i) => i !== index)
   } else {
-    // Crear un nuevo array con el nuevo elemento
     selectedExportUsers.value = [...selectedExportUsers.value, email]
   }
 }
@@ -565,8 +585,8 @@ async function deleteUserConfirmed() {
 }
 
 function confirmDeleteSession(userId: string, sessionId: string, sessionLabel: string) {
-  if (currentRole.value !== 'admin') {
-    toastMessage.value = 'Només els administradors poden esborrar sessions.'
+  if (currentRole.value !== 'admin' && currentRole.value !== 'gestor') {
+    toastMessage.value = 'Només els administradors i gestors poden esborrar sessions.'
     toastColor.value = 'warning'
     showToast.value = true
     return
@@ -589,7 +609,7 @@ async function deleteSessionConfirmed() {
     toastMessage.value = `Sessió ${sessionLabel} eliminada correctament.`
     toastColor.value = 'success'
     showToast.value = true
-    await loadAdminData()
+    await loadUserDetailsData(true, true)
     currentTab.value = 'cronometres'
   } catch (error) {
     console.error('Error esborrant sessió:', error)
@@ -615,15 +635,54 @@ function getCangursList(cangurs: any[]) {
 }
 
 async function loadAdminData() {
-  loading.value = true
-  loadDataError.value = ''
+  loadingUsers.value = true
+  usersLoadError.value = ''
   try {
-    const data = await adminService.getAllUsersData()
-    allUsers.value = data.filter((u: any) => !u.eliminado)
-    selectedExportUsers.value = data.map(u => u.email)
+    detailsLoaded.value = false
+    detailsLoadError.value = ''
+    allCronometres.value = []
+    cronometresByUser.value = []
 
-    const list: any[] = []
-    data.forEach(u => u.cronometres.forEach((c: any) => list.push({
+    const data = await adminService.getAllUsersBasicData()
+    const activeUsers = data.filter((u: any) => !u.eliminado)
+
+    allUsers.value = activeUsers.map((u: any) => ({
+      uid: u.uid,
+      name: u.name,
+      email: u.email,
+      rol: u.rol || 'usuari',
+      createdAt: u.createdAt,
+      cronometres: [],
+      nadons: [],
+      cangurs: [],
+      detailsLoaded: false,
+      eliminado: false
+    }))
+
+    selectedExportUsers.value = allUsers.value.map(u => u.email)
+
+    // Launch heavy reads after users are already visible.
+    window.setTimeout(() => {
+      loadUserDetailsData(false).catch(() => {
+        // Error handled in loadUserDetailsData
+      })
+    }, 0)
+  } catch (error: any) {
+    console.error('Error carregant dades del panell admin:', error)
+    allUsers.value = []
+    allCronometres.value = []
+    cronometresByUser.value = []
+    usersLoadError.value = 'No hem pogut carregar els usuaris ara mateix. Torna-ho a provar en uns moments.'
+  } finally {
+    loadingUsers.value = false
+  }
+}
+
+function buildSessionsFromUsers() {
+  const list: any[] = []
+
+  allUsers.value.forEach((u) => {
+    u.cronometres.forEach((c: any) => list.push({
       ...c,
       id: `${u.uid}-${c.id}`,
       sessionId: c.id,
@@ -632,25 +691,67 @@ async function loadAdminData() {
       userEmail: u.email,
       cangurNom: c.cangurNom || 'Desconegut',
       nadoNom: c.nadoNom || 'Desconegut'
-    })))
-    allCronometres.value = list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-
-    const groups = new Map()
-    allCronometres.value.forEach(c => {
-      if (!groups.has(c.userEmail)) groups.set(c.userEmail, [])
-      groups.get(c.userEmail).push(c)
-    })
-    cronometresByUser.value = Array.from(groups.entries()).map(([email, cronos]) => ({
-      userEmail: email, userName: cronos[0].userName, cronometres: cronos
     }))
-  } catch (error: any) {
-    console.error('Error carregant dades del panell admin:', error)
-    allUsers.value = []
-    allCronometres.value = []
-    cronometresByUser.value = []
-    loadDataError.value = 'No hem pogut carregar les dades ara mateix. Torna-ho a provar en uns moments.'
+  })
+
+  allCronometres.value = list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+
+  const groups = new Map<string, any[]>()
+  allCronometres.value.forEach((c) => {
+    if (!groups.has(c.userEmail)) groups.set(c.userEmail, [])
+    groups.get(c.userEmail)?.push(c)
+  })
+
+  cronometresByUser.value = Array.from(groups.entries()).map(([email, cronos]) => ({
+    userEmail: email,
+    userName: cronos[0]?.userName,
+    cronometres: cronos
+  }))
+}
+
+async function loadUserDetailsData(_showLoader = false, force = false) {
+  if (loadingDetails.value) return
+  if (detailsLoaded.value && !force) return
+  if (!allUsers.value.length) {
+    detailsLoaded.value = true
+    return
+  }
+
+  loadingDetails.value = true
+  detailsLoadError.value = ''
+
+  try {
+    const userIds = allUsers.value.map(u => u.uid)
+    const details = await adminService.getUsersDetailsData(userIds)
+    const detailsMap = new Map(details.map((d: any) => [d.uid, d]))
+
+    allUsers.value = allUsers.value.map((user) => {
+      const detail = detailsMap.get(user.uid)
+      return {
+        ...user,
+        cronometres: detail?.cronometres || [],
+        nadons: detail?.nadons || [],
+        cangurs: detail?.cangurs || [],
+        detailsLoaded: true
+      }
+    })
+
+    buildSessionsFromUsers()
+    detailsLoaded.value = true
+  } catch (error) {
+    console.error('Error carregant detall d\'usuaris:', error)
+    detailsLoadError.value = 'No hem pogut carregar les sessions ara mateix. Torna-ho a provar en uns moments.'
   } finally {
-    loading.value = false
+    loadingDetails.value = false
+  }
+}
+
+function onTabChange(event: CustomEvent) {
+  currentTab.value = event.detail.value as string
+  if (currentTab.value === 'cronometres' && !detailsLoaded.value) {
+    loadUserDetailsData(true).catch(() => {
+      // Error handled in loadUserDetailsData
+    })
   }
 }
 
@@ -736,6 +837,20 @@ onIonViewDidEnter(async () => {
   margin: 4px 0;
 }
 
+.stat-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.sessions-loading-text {
+  margin-top: 10px;
+  font-size: 0.95rem;
+  color: #666;
+}
+
 .cangurs-list span {
   font-style: italic;
   color: #26a69a;
@@ -747,6 +862,10 @@ onIonViewDidEnter(async () => {
 
 .stats-col {
   text-align: left;
+}
+
+.stats-col-manager {
+  text-align: right;
 }
 
 .admin-actions {

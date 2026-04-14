@@ -1,67 +1,71 @@
 import { auth, db } from './firebase'
-import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore'
 import authService from './auth.service'
 
 /**
- * Obtenir totes les dades de la base de dades (només per superusuaris)
+ * Obtenir usuaris (càrrega lleugera, sense subcol·leccions)
  */
-async function getAllUsersData() {
+async function getAllUsersBasicData() {
   try {
     const usersRef = collection(db, 'users')
     const usersSnap = await getDocs(usersRef)
-    
-    const allUsersData = []
-    
-    for (const userDoc of usersSnap.docs) {
-      const userData = userDoc.data()
-      const userId = userDoc.id
-      
-      // Obté els cronòmetres de l'usuari
-      const cronometresRef = collection(db, 'users', userId, 'cronometres')
-      const cronometresSnap = await getDocs(cronometresRef)
-      const cronometres = cronometresSnap.docs
-        .filter(d => !d.data().eliminado)
-        .map(d => ({
-          id: d.id,
-          ...d.data()
-        }))
-      
-      // Obté els nadons de l'usuari
-      const nadonsRef = collection(db, 'users', userId, 'nadons')
-      const nadonsSnap = await getDocs(nadonsRef)
-      const nadons = nadonsSnap.docs
-        .filter(d => !d.data().eliminado)
-        .map(d => ({
-          id: d.id,
-          ...d.data()
-        }))
 
-      // Obté els cangurs de l'usuari
-      const cangursRef = collection(db, 'users', userId, 'cangurs')
-      const cangursSnap = await getDocs(cangursRef)
-      const cangurs = cangursSnap.docs
-        .filter(d => !d.data().eliminado)
-        .map(d => ({
-          id: d.id,
-          ...d.data()
-        }))
-      
-      allUsersData.push({
-        uid: userId,
+    return usersSnap.docs.map((userDoc) => {
+      const userData = userDoc.data()
+      return {
+        uid: userDoc.id,
         name: userData.name,
         email: userData.email,
         rol: userData.rol || 'usuari',
         createdAt: userData.createdAt,
-        eliminado: !!userData.eliminado,
+        eliminado: !!userData.eliminado
+      }
+    })
+  } catch (error) {
+    console.error('Error obtenint usuaris:', error)
+    throw error
+  }
+}
+
+/**
+ * Obtenir subcol·leccions dels usuaris (càrrega pesada)
+ */
+async function getUsersDetailsData(userIds: string[]) {
+  try {
+    const details = await Promise.all(userIds.map(async (userId) => {
+      const cronometresRef = collection(db, 'users', userId, 'cronometres')
+      const nadonsRef = collection(db, 'users', userId, 'nadons')
+      const cangursRef = collection(db, 'users', userId, 'cangurs')
+
+      const [cronometresSnap, nadonsSnap, cangursSnap] = await Promise.all([
+        getDocs(cronometresRef),
+        getDocs(nadonsRef),
+        getDocs(cangursRef)
+      ])
+
+      const cronometres = cronometresSnap.docs
+        .filter(d => !d.data().eliminado)
+        .map(d => ({ id: d.id, ...d.data() }))
+
+      const nadons = nadonsSnap.docs
+        .filter(d => !d.data().eliminado)
+        .map(d => ({ id: d.id, ...d.data() }))
+
+      const cangurs = cangursSnap.docs
+        .filter(d => !d.data().eliminado)
+        .map(d => ({ id: d.id, ...d.data() }))
+
+      return {
+        uid: userId,
         cronometres,
         nadons,
         cangurs
-      })
-    }
-    
-    return allUsersData
+      }
+    }))
+
+    return details
   } catch (error) {
-    console.error('Error obtenint les dades de tots els usuaris:', error)
+    console.error('Error obtenint detall de subcol·leccions:', error)
     throw error
   }
 }
@@ -221,7 +225,8 @@ async function getCurrentUserAdminStatus() {
 }
 
 export default {
-  getAllUsersData,
+  getAllUsersBasicData,
+  getUsersDetailsData,
   updateUserRol,
   deleteUser,
   deleteSession,

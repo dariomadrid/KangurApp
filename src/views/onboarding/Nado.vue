@@ -23,13 +23,15 @@
           </div>
 
           <div class="datetime-wheel-container" @click="openGestationPicker">
-            <div class="wheel-labels">
-              <span>Setmanes</span>
-              <span>Dies</span>
-            </div>
-
             <div class="wheel-display">
-              {{ setmanes }} + {{ dies }}
+              <div class="wheel-value">
+                <div class="wheel-label">Setmanes</div>
+                <div class="wheel-number">{{ setmanes }}</div>
+              </div>
+              <div class="wheel-value">
+                <div class="wheel-label">Dies</div>
+                <div class="wheel-number">{{ dies }}</div>
+              </div>
             </div>
           </div>
 
@@ -161,31 +163,35 @@ const Registre = async () => {
   position: relative;
   overflow: hidden;
   cursor: pointer;
-}
-
-.wheel-labels {
-  display: flex;
-  justify-content: space-around;
-  position: absolute;
-  top: 10px;
-  width: 100%;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.wheel-labels span {
-  font-size: 12px;
-  color: #888;
-  font-weight: bold;
-  text-transform: uppercase;
-  flex: 1;
-  text-align: center;
+  padding: 20px;
 }
 
 .wheel-display {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
   text-align: center;
-  font-size: 24px;
+}
+
+.wheel-value {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.wheel-label {
+  font-size: 11px;
+  color: #888;
   font-weight: bold;
-  padding: 70px 0 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wheel-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: #333;
 }
 </style>

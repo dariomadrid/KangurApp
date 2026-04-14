@@ -222,7 +222,6 @@ async function register(payload: { name: string; email: string; password: string
             eliminado: false
           }, { merge: true })
         } else {
-          // Account is active already.
           throw new Error('Aquest correu ja està en ús. Inicia sessió.')
         }
 
@@ -259,7 +258,6 @@ async function login(payload: { email: string; password: string }) {
   try {
     userCredential = await signInWithEmailAndPassword(auth, payload.email, payload.password)
   } catch (error: any) {
-    // Map Firebase auth error codes to user-friendly messages
     if (error?.code === 'auth/invalid-login-credentials' || error?.code === 'auth/user-not-found' || error?.code === 'auth/wrong-password') {
       throw new Error('Credencials incorrectes. Verifica el correu i la contrasenya.')
     }
@@ -272,7 +270,6 @@ async function login(payload: { email: string; password: string }) {
     if (error?.code === 'auth/invalid-email') {
       throw new Error('Format de correu electrònic no vàlid.')
     }
-    // Re-throw as generic credentials error if we don't recognize the error
     throw new Error('Credencials incorrectes.')
   }
   const user = userCredential.user
@@ -296,7 +293,6 @@ async function login(payload: { email: string; password: string }) {
     } as any
   }
 
-  // If Firestore profile is missing but Auth account exists, restore a minimal profile.
   if (!userDoc.exists()) {
     await setDoc(userDocRef, {
       name: user.displayName || payload.email.split('@')[0],
@@ -316,7 +312,6 @@ async function login(payload: { email: string; password: string }) {
 
   const userData = userDoc.data()
 
-  // User must be explicitly active to login - block if eliminado is truthy
   if (userData?.eliminado) {
     await signOut(auth)
     await removeToken()

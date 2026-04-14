@@ -39,15 +39,19 @@
             </IonCol>
           </IonRow>
           <IonRow class="ion-justify-content-center">
-            <IonCol size="6">
-              <IonLabel position="stacked" class="input-label">Setmanes</IonLabel>
-              <IonInput v-model="setmanesName" placeholder="Setmanes" fill="outline"
-                class="input-box ion-margin-top ion-margin-bottom" />
-            </IonCol>
-            <IonCol size="6">
-              <IonLabel position="stacked" class="input-label">Dies</IonLabel>
-              <IonInput v-model="diesName" placeholder="Dies" fill="outline"
-                class="input-box ion-margin-top ion-margin-bottom" />
+            <IonCol size="12">
+              <div class="datetime-wheel-container" @click="openGestationPicker">
+                <div class="wheel-display">
+                  <div class="wheel-value">
+                    <div class="wheel-label">Setmanes</div>
+                    <div class="wheel-number">{{ setmanesName }}</div>
+                  </div>
+                  <div class="wheel-value">
+                    <div class="wheel-label">Dies</div>
+                    <div class="wheel-number">{{ diesName }}</div>
+                  </div>
+                </div>
+              </div>
             </IonCol>
           </IonRow>
         </IonGrid>
@@ -177,7 +181,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { IonButton, IonText, IonIcon, IonList, IonItem, IonLabel, IonInput, IonGrid, IonRow, IonCol, IonToast, IonModal, IonContent, IonCard, IonSelect, IonSelectOption, IonLoading, IonSpinner } from '@ionic/vue'
+import { IonButton, IonText, IonIcon, IonList, IonItem, IonLabel, IonInput, IonGrid, IonRow, IonCol, IonToast, IonModal, IonContent, IonCard, IonSelect, IonSelectOption, IonLoading, IonSpinner, pickerController } from '@ionic/vue'
 import { addOutline, personOutline, trashOutline, checkbox } from 'ionicons/icons'
 import AppLayout from '@/components/AppLayout.vue'
 
@@ -321,6 +325,32 @@ const confirmDeleteCangur = (index: number) => {
 
   pendingDeleteCangur.value = { index, nom: c.nom }
   showDeleteCangurAlert.value = true
+}
+
+async function openGestationPicker() {
+  const picker = await pickerController.create({
+    columns: [
+      {
+        name: 'setmanes',
+        options: Array.from({ length: 22 }, (_, i) => ({ text: `${i + 22}`, value: i + 22 }))
+      },
+      {
+        name: 'dies',
+        options: Array.from({ length: 8 }, (_, i) => ({ text: `${i}`, value: i }))
+      }
+    ],
+    buttons: [
+      { text: 'Cancel', role: 'cancel' },
+      { 
+        text: 'Ok', 
+        handler: (val: any) => {
+          diesName.value = val.dies.value.toString()
+          setmanesName.value = val.setmanes.value.toString()
+        }
+      }
+    ]
+  })
+  picker.present()
 }
 
 const deleteCangurConfirmed = async () => {
@@ -520,5 +550,43 @@ const desar = async () => {
 
 .modal-buttons-compact IonButton {
   flex: 1;
+}
+
+.datetime-wheel-container {
+  background: #f4f4f4;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 20px;
+}
+
+.wheel-display {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  text-align: center;
+}
+
+.wheel-value {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.wheel-label {
+  font-size: 11px;
+  color: #888;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wheel-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: #333;
 }
 </style>
